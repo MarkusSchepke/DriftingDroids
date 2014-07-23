@@ -129,7 +129,7 @@ public class SwingGUI implements ActionListener {
     
     private static final ResourceBundle L10N = ResourceBundle.getBundle("driftingdroids-localization-ui");  //L10N = Localization
     
-    private Board board = null;
+    private volatile Board board = null;
     private BoardCell[] boardCells = new BoardCell[0]; // init placeholder
     private int boardCellsWidth = 0, boardCellsHeight = 0; // init placeholder
     private int[] currentPosition;
@@ -370,7 +370,7 @@ public class SwingGUI implements ActionListener {
     private class SolverTask extends SwingWorker<Solver, Object> {
         @Override
         protected Solver doInBackground() throws Exception {
-            final Solver solver = Solver.createInstance(board);
+            final Solver solver = Solver.createInstance(Board.createClone(board));
             solver.setOptionSolutionMode((Solver.SOLUTION_MODE)jcomboOptSolutionMode.getSelectedItem());
             solver.setOptionAllowRebounds(jcheckOptAllowRebounds.isSelected());
             jtextSolution.setText(null);
@@ -556,6 +556,8 @@ public class SwingGUI implements ActionListener {
                                     refreshJcomboRobots();
                                     refreshJComboPlaceRobot();
                                     refreshJlistQuadrants();
+                                    jspinWidth.getModel().setValue(Integer.valueOf(board.width));
+                                    jspinHeight.getModel().setValue(Integer.valueOf(board.height));
                                 } else {
                                     throw new IllegalArgumentException();   //show error message
                                 }
@@ -604,14 +606,20 @@ public class SwingGUI implements ActionListener {
         this.jspinWidth.addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                makeFreestyleBoard();
+                final int width = ((SpinnerNumberModel)jspinWidth.getModel()).getNumber().intValue();
+                if (width != board.width) {
+                    makeFreestyleBoard();
+                }
             }
         });
         this.jspinHeight.setModel(new SpinnerNumberModel(Board.HEIGHT_STANDARD, Board.HEIGHT_MIN, Board.HEIGHT_MAX, 1));
         this.jspinHeight.addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                makeFreestyleBoard();
+                final int height = ((SpinnerNumberModel)jspinHeight.getModel()).getNumber().intValue();
+                if (height != board.height) {
+                    makeFreestyleBoard();
+                }
             }
         });
 
@@ -902,11 +910,14 @@ public class SwingGUI implements ActionListener {
         this.jtabPreparePlay.addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                refreshBoard(); // repaint the entire board
-                if (isModePlay()) {
+                SwingGUI.this.refreshBoard(); // repaint the entire board
+                if (SwingGUI.this.isModePlay()) {
                     SwingGUI.this.updateBoardGetRobots(); // start solver thread
                 } else {
                     SwingGUI.this.removeSolution(); // stop solver thread
+                    if (SwingGUI.this.isModeEditBoard()) {
+                        SwingGUI.this.board.setRobots(SwingGUI.this.currentPosition);
+                    }
                 }
             }
         });
